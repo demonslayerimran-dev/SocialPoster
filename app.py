@@ -250,23 +250,45 @@ def youtube_connect():
         flash("طلع client_secret.json أولا", "error")
         return redirect(url_for("settings"))
 
-    def run():
-        try:
-            from google_auth_oauthlib.flow import InstalledAppFlow
-            youtube_state["msg"] = "تحل المتصفح… دخل لحسابك ووافق"
-            flow = InstalledAppFlow.from_client_secrets_file(
-                config.YOUTUBE_SECRET, scopes=["https://www.googleapis.com/auth/youtube.upload"])
-            creds = flow.run_local_server(port=0, open_browser=True,
-                                          success_message="تم الربط! رجع للبرنامج.")
-            with open(config.YOUTUBE_TOKEN, "w") as f:
-                f.write(creds.to_json())
-            youtube_state["msg"] = "YouTube مربوط ✓"
-        except Exception as e:
-            youtube_state["msg"] = f"فشل الربط: {e}"
-
-    threading.Thread(target=run, daemon=True).start()
-    flash("غادي يتحل المتصفح باش توافق على الربط…", "ok")
+    # Google كترجع الجواب للبرنامج نيت (نفس البورت ديال البرنامج)
+    import webbrowser
+    from google_auth_oauthlib.flow import Flow
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"  # عادي: الرابط محلي فالحاسوب فقط
+    flow = Flow.from_client_secrets_file(
+        config.YOUTUBE_SECRET,
+        scopes=["https://www.googleapis.com/auth/youtube.upload"],
+        redirect_uri=f"http://127.0.0.1:{request.host.split(':')[-1]}/youtube/callback")
+    auth_url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    youtube_state.update(flow=flow, state=state, msg="تحل المتصفح… دخل لحسابك ووافق")
+    webbrowser.open(auth_url)
+    flash("تحل المتصفح: اختار الحساب ديالك ووافق، ومن بعد رجع لهنا", "ok")
     return redirect(url_for("settings"))
+
+
+@app.route("/youtube/callback")
+def youtube_callback():
+    flow = youtube_state.get("flow")
+    page = ("<html dir=rtl><body style='font-family:Segoe UI,Tahoma;text-align:center;padding:60px'>"
+            "<h2>{}</h2><p>{}</p></body></html>")
+    if not flow or request.args.get("state") != youtube_state.get("state"):
+        return page.format("❌ الرابط تسالا", "رجع للبرنامج وضغط «ربط YouTube» من جديد.")
+    if request.args.get("error"):
+        youtube_state["msg"] = f"تلغى الربط: {request.args['error']}"
+        return page.format("❌ ما تمش الربط", "رجع للبرنامج وعاود.")
+    try:
+        flow.fetch_token(code=request.args.get("code"))
+        with open(config.YOUTUBE_TOKEN, "w") as f:
+            f.write(flow.credentials.to_json())
+        youtube_state.update(flow=None, msg="YouTube مربوط ✓")
+        return page.format("✅ تم ربط YouTube", "تقدر تسد هاد الصفحة وترجع للبرنامج SocialPoster.")
+    except Exception as e:
+        youtube_state["msg"] = f"فشل الربط: {e}"
+        return page.format("❌ فشل الربط", str(e))
+
+
+@app.route("/api/youtube")
+def youtube_status():
+    return {"connected": os.path.exists(config.YOUTUBE_TOKEN), "pending": bool(youtube_state.get("flow"))}
 
 
 @app.route("/youtube/disconnect", methods=["POST"])
