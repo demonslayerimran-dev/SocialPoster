@@ -15,6 +15,13 @@
 </style>
 {% endblock %}
 {% block body %}
+<script>
+  // ملي يكمل ربط YouTube فالمتصفح، الصفحة كتحدث بوحدها
+  setInterval(async () => {
+    try { const r = await (await fetch('/api/youtube')).json();
+          if (r.connected && !{{ 'true' if yt_token else 'false' }}) location.reload(); } catch (e) {}
+  }, 3000);
+</script>
   <h1>الإعدادات</h1>
   <p class="sub">عمر غير المنصات اللي بغيتي. المفاتيح كيتحفظو غير فهاد الحاسوب.</p>
 
