@@ -1,0 +1,33 @@
+name: Build Windows app
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install libraries
+        run: pip install -r requirements.txt
+
+      - name: Build exe
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name SocialPoster
+          --icon assets\icon.ico
+          --add-data "templates;templates"
+          --collect-data googleapiclient
+          --hidden-import waitress
+          desktop.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SocialPoster-windows
+          path: dist/SocialPoster.exe
