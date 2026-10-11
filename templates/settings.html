@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  details.card{padding:0}
+  details.card summary{padding:16px 20px;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;align-items:center;list-style:none}
+  details.card summary::-webkit-details-marker{display:none}
+  details.card .inner{padding:0 20px 18px}
+  .state{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}
+  .state.ok{background:#e7f6ec;color:var(--ok)} .state.no{background:#f1f0ec;color:var(--muted)}
+  .help{background:#faf9f6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .check{display:flex;gap:10px;align-items:center;margin:10px 0}
+  .pw{position:relative} .pw button{position:absolute;left:6px;top:6px;padding:4px 10px;font-size:12px}
+  .save{position:sticky;bottom:12px;text-align:center}
+  .save button{box-shadow:0 6px 20px rgba(107,60,245,.35);padding:13px 40px}
+</style>
+{% endblock %}
+{% block body %}
+  <h1>الإعدادات</h1>
+  <p class="sub">عمر غير المنصات اللي بغيتي. المفاتيح كيتحفظو غير فهاد الحاسوب.</p>
+
+  <form method="post" enctype="multipart/form-data">
+    {% for key, g in groups.items() %}
+    {% set st = status.get(key) %}
+    <details class="card" {% if loop.first %}open{% endif %}>
+      <summary>
+        <span>{{ g.title }}</span>
+        {% if key == 'facebook' %}
+          {% set ok1 = status.facebook.ready %}{% set ok2 = status.instagram.ready %}
+          <span class="state {{ 'ok' if ok1 else 'no' }}">FB {{ '✓' if ok1 else '—' }} · IG {{ '✓' if ok2 else '—' }}</span>
+        {% elif st %}
+          <span class="state {{ 'ok' if st.ready else 'no' }}">{{ 'مربوطة ✓' if st.ready else 'ماشي مربوطة' }}</span>
+        {% endif %}
+      </summary>
+      <div class="inner">
+        {% if g.help %}<div class="help">{{ g.help }}</div>{% endif %}
+        {% for fkey, label, kind, ph in g.fields %}
+          {% if kind == 'bool' %}
+            <label class="check"><input type="checkbox" name="{{fkey}}" {% if values.get(fkey)=='1' %}checked{% endif %}> {{label}}</label>
+          {% else %}
+            <label class="t" for="{{fkey}}">{{label}}</label>
+            <div class="pw">
+              <input type="{{ 'password' if kind=='secret' else 'text' }}" id="{{fkey}}" name="{{fkey}}"
+                     value="{{ values.get(fkey,'') }}" placeholder="{{ph}}" autocomplete="off">
+              {% if kind=='secret' %}<button type="button" class="soft" onclick="const i=document.getElementById('{{fkey}}');i.type=i.type==='password'?'text':'password'">بين</button>{% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {% if key == 'youtube' %}
+          <label class="t">ملف client_secret.json</label>
+          <input type="file" name="client_secret" accept=".json">
+          <div class="hint">{{ 'الملف كاين ✓' if yt_secret else 'مازال ما طلعتيهش' }}</div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            {% if yt_token %}
+              <span class="state ok">الحساب مربوط ✓</span>
+              <button class="ghost" formaction="/youtube/disconnect" formnovalidate>فصل الحساب</button>
+            {% else %}
+              <button class="soft" formaction="/youtube/connect" formnovalidate {% if not yt_secret %}disabled title="طلع client_secret.json وحفظ أولا"{% endif %}>ربط YouTube</button>
+            {% endif %}
+          </div>
+          {% if yt_msg %}<div class="hint" style="margin-top:6px">{{ yt_msg }}</div>{% endif %}
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+
+    <div class="save"><button type="submit">حفظ</button></div>
+  </form>
+
+  <p class="hint" style="margin-top:20px">الملفات ديال البرنامج محفوظين فـ: <span dir="ltr">{{data_dir}}</span>
+    — <a href="/open-data">حل الدوسي</a></p>
+{% endblock %}

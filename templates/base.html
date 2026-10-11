@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SocialPoster</title>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1b1a1f;--muted:#6b6875;--line:#e6e2da;
+        --accent:#6b3cf5;--accent-soft:#efe9ff;--ok:#1f8a4c;--err:#c0392b;--warn:#b7791f}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Tahoma,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  nav{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;display:flex;align-items:center;gap:6px;padding:10px 18px}
+  nav .logo{font-weight:800;margin-left:18px;letter-spacing:.3px}
+  nav .logo b{color:#a98bff}
+  nav a{color:#cfcbe0;text-decoration:none;padding:7px 14px;border-radius:8px}
+  nav a.on,nav a:hover{background:#2f2c38;color:#fff}
+  .wrap{max-width:980px;margin:0 auto;padding:22px 16px 60px}
+  h1{font-size:26px;margin:0 0 4px} h1 span{color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  h2{font-size:17px;margin:0 0 12px}
+  label.t{display:block;font-weight:600;margin:14px 0 6px}
+  textarea,input[type=text],input[type=password],input[type=datetime-local]{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff}
+  input[type=text],input[type=password]{direction:ltr;text-align:left}
+  textarea{min-height:100px;resize:vertical}
+  button,.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 20px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+  button.ghost{background:transparent;color:var(--err);padding:4px 8px;font-size:13px}
+  button.soft,.btn.soft{background:var(--accent-soft);color:var(--accent)}
+  .flash{padding:10px 14px;border-radius:10px;margin-bottom:10px}
+  .flash.ok{background:#e7f6ec;color:var(--ok)} .flash.error{background:#fdecea;color:var(--err)}
+  .banner{background:#fff6e0;color:var(--warn);padding:10px 14px;border-radius:10px;margin-bottom:14px}
+  .banner a{color:inherit;font-weight:700}
+  .hint{font-size:12px;color:var(--muted)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;margin:2px;background:var(--accent-soft)}
+  .tag.ok{background:#e7f6ec;color:var(--ok)} .tag.error{background:#fdecea;color:var(--err)}
+  .tag.pending,.tag.cancelled{background:#f1f0ec;color:var(--muted)}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav>
+  <span class="logo">Social<b>Poster</b></span>
+  <a href="/" class="{{ 'on' if page=='post' }}">نشر</a>
+  <a href="/settings" class="{{ 'on' if page=='settings' }}">الإعدادات</a>
+</nav>
+<div class="wrap">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{cat}}">{{m}}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</div>
+</body>
+</html>

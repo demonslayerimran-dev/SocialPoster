@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:#fbfaf7;display:block}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop img,.drop video{max-height:180px;max-width:100%;border-radius:8px;display:block;margin:0 auto 8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+  .pf{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
+  .pf.off{opacity:.5;cursor:not-allowed}
+  .pf small{display:block;color:var(--muted);font-size:12px}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{padding:8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+  .table-wrap{overflow-x:auto}
+</style>
+{% endblock %}
+{% block body %}
+  <h1>منشور واحد. <span>فكل بلاصة.</span></h1>
+  <p class="sub">طلع صورة ولا فيديو، اختار المنصات، ونشر دابا ولا برمج الوقت.</p>
+
+  {% if not any_ready %}
+    <div class="banner">حتى منصة ماشي مربوطة مازال. <a href="/settings">سير للإعدادات</a> وبدا بـ Telegram ولا Discord (5 دقايق).</div>
+  {% endif %}
+  {% if dry_run %}<div class="banner">وضع التجربة خدام: والو ما غادي يتنشر بصح. تقدر تطفيه من <a href="/settings">الإعدادات</a>.</div>{% endif %}
+
+  <form class="card" action="/post" method="post" enctype="multipart/form-data">
+    <h2>منشور جديد</h2>
+    <label class="drop" id="drop">
+      <input type="file" name="file" id="file" accept="image/*,video/mp4,video/quicktime" hidden required>
+      <div id="preview"></div>
+      <div id="dropText">اضغط هنا ولا جر الصورة/الفيديو لهنا</div>
+    </label>
+
+    <label class="t" for="caption">النص (caption)</label>
+    <textarea name="caption" id="caption" placeholder="كتب النص ديال المنشور… السطر الأول غادي يكون هو العنوان فـ YouTube وPinterest"></textarea>
+    <div class="hint"><span id="count">0</span> حرف · X كيقبل 280 حرف فقط</div>
+
+    <label class="t">المنصات</label>
+    <div class="grid">
+      {% for key, s in status.items() %}
+      <label class="pf {% if not s.ready %}off{% endif %}" title="{{ 'ناقص: ' ~ s.missing|join('، ') if not s.ready }}">
+        <input type="checkbox" name="platforms" value="{{key}}" data-media="{{s.media|join(',')}}"
+               {% if s.ready %}checked{% else %}disabled{% endif %}>
+        <span>{{s.label}}
+          <small>{% if s.ready %}{{ 'صور + فيديو' if s.media|length == 2 else ('فيديو فقط' if s.media[0]=='video' else 'صور فقط') }}{% else %}ماشي مربوطة{% endif %}</small>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+
+    <label class="t">إمتى؟</label>
+    <div class="row">
+      <label><input type="radio" name="when" value="now" checked> دابا</label>
+      <label><input type="radio" name="when" value="later"> فوقت محدد</label>
+      <input type="datetime-local" name="run_at" id="run_at" min="{{now}}" style="max-width:260px;display:none">
+    </div>
+
+    <div style="margin-top:18px"><button type="submit">نشر</button></div>
+  </form>
+
+  <div class="card">
+    <h2>السجل</h2>
+    {% if not posts %}<p class="hint">مازال ما نشرتي والو.</p>{% else %}
+    <div class="table-wrap"><table>
+      <tr><th>#</th><th>النص</th><th>الوقت</th><th>الحالة</th><th>المنصات</th><th></th></tr>
+      {% for p in posts %}
+      <tr>
+        <td>{{p.id}}</td>
+        <td>{{ (p.caption or '—')[:60] }}<div class="hint">{{ 'صورة' if p.media_type=='image' else 'فيديو' }}</div></td>
+        <td>{{p.run_at.replace('T',' ')}}</td>
+        <td>{{ {'scheduled':'مبرمج','running':'كينشر…','done':'تم ✓','partial':'تم جزئيا','failed':'فشل','cancelled':'ملغي'}[p.status] }}</td>
+        <td>{% for r in results.get(p.id, []) %}
+            <span class="tag {{r.status}}" title="{{r.detail}}">{{ status[r.platform].label }}</span>
+            {% endfor %}</td>
+        <td>
+          {% if p.status=='scheduled' %}<form method="post" action="/cancel/{{p.id}}"><button class="ghost">إلغاء</button></form>{% endif %}
+          {% if p.status in ('partial','failed') %}<form method="post" action="/retry/{{p.id}}"><button class="ghost" style="color:var(--accent)">عاود</button></form>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table></div>
+    <p class="hint">حط الماوس على المنصة باش تشوف الرابط أو سبب الخطأ.</p>
+    {% endif %}
+  </div>
+
+<script>
+  const file = document.getElementById('file'), drop = document.getElementById('drop'),
+        dropText = document.getElementById('dropText'), preview = document.getElementById('preview');
+  function onFile(){
+    const f = file.files[0]; if (!f) return;
+    const type = f.type.startsWith('video') ? 'video' : 'image';
+    dropText.textContent = f.name + ' — ' + (type === 'video' ? 'فيديو' : 'صورة');
+    const url = URL.createObjectURL(f);
+    preview.innerHTML = type === 'video' ? `<video src="${url}" muted controls></video>` : `<img src="${url}">`;
+    document.querySelectorAll('input[name=platforms]:not([disabled])').forEach(cb => {
+      const ok = cb.dataset.media.split(',').includes(type);
+      cb.checked = ok; cb.closest('.pf').classList.toggle('off', !ok);
+    });
+  }
+  file.addEventListener('change', onFile);
+  ['dragover','dragenter'].forEach(e => drop.addEventListener(e, ev => {ev.preventDefault(); drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(e => drop.addEventListener(e, () => drop.classList.remove('over')));
+  drop.addEventListener('drop', ev => { ev.preventDefault(); file.files = ev.dataTransfer.files; onFile(); });
+
+  const cap = document.getElementById('caption'), count = document.getElementById('count');
+  cap.addEventListener('input', () => count.textContent = cap.value.length);
+  const runAt = document.getElementById('run_at');
+  document.querySelectorAll('input[name=when]').forEach(r => r.addEventListener('change', () => {
+    const later = document.querySelector('input[name=when]:checked').value === 'later';
+    runAt.style.display = later ? 'block' : 'none'; runAt.required = later;
+  }));
+
+  // تحديث تلقائي ملي يكون شي منشور كيتنشر
+  setInterval(async () => {
+    try { const r = await (await fetch('/api/busy')).json();
+          if (r.running > 0 || document.body.dataset.wasBusy === '1') {
+            document.body.dataset.wasBusy = r.running > 0 ? '1' : '0';
+            if (r.running === 0) location.reload();
+          } } catch (e) {}
+  }, 3000);
+  {% if posts and posts[0].status == 'running' %}document.body.dataset.wasBusy = '1';{% endif %}
+</script>
+{% endblock %}
