@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SocialPoster – TikTok</title>
+<style>
+  body{margin:0;font-family:"Segoe UI",Tahoma,system-ui,sans-serif;background:#f6f4ef;color:#1b1a1f;text-align:center;padding:60px 20px}
+  .muted{color:#6b6875} a{color:#6b3cf5}
+</style>
+</head>
+<body>
+  <h2 id="t">كنرجعوك للبرنامج SocialPoster…</h2>
+  <p class="muted" id="m">إلا ما تحلش البرنامج بوحدو، تأكد أن SocialPoster مفتوح فالحاسوب.</p>
+  <p><a id="l" href="#">ضغط هنا إلا ما وقع والو</a></p>
+<script>
+  // TikTok كتشترط رابط https، داكشي علاش كتجي لهنا أولا،
+  // ومن بعد كنصيفطو الجواب للبرنامج اللي خدام فالحاسوب ديالك.
+  var target = "http://127.0.0.1:51791/tiktok/callback" + window.location.search;
+  document.getElementById("l").href = target;
+  if (window.location.search.indexOf("code=") === -1 && window.location.search.indexOf("error=") === -1) {
+    document.getElementById("t").textContent = "SocialPoster – TikTok";
+    document.getElementById("m").textContent = "هاد الصفحة كتستعمل غير فربط TikTok بالبرنامج.";
+    document.getElementById("l").style.display = "none";
+  } else {
+    window.location.replace(target);
+  }
+</script>
+</body>
+</html>

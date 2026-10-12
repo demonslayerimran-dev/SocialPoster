@@ -241,7 +241,8 @@ def settings():
                            status=platforms.status(), page="settings",
                            yt_secret=os.path.exists(config.YOUTUBE_SECRET),
                            yt_token=os.path.exists(config.YOUTUBE_TOKEN),
-                           yt_msg=youtube_state["msg"], data_dir=config.DATA_DIR)
+                           yt_msg=youtube_state["msg"], data_dir=config.DATA_DIR,
+                           tt_token=os.path.exists(config.TIKTOK_TOKEN), tt_msg=tiktok_state["msg"])
 
 
 @app.route("/youtube/connect", methods=["POST"])
@@ -288,7 +289,8 @@ def youtube_callback():
 
 @app.route("/api/youtube")
 def youtube_status():
-    return {"connected": os.path.exists(config.YOUTUBE_TOKEN), "pending": bool(youtube_state.get("flow"))}
+    return {"connected": os.path.exists(config.YOUTUBE_TOKEN), "pending": bool(youtube_state.get("flow")),
+            "tiktok": os.path.exists(config.TIKTOK_TOKEN)}
 
 
 @app.route("/youtube/disconnect", methods=["POST"])
@@ -296,6 +298,54 @@ def youtube_disconnect():
     if os.path.exists(config.YOUTUBE_TOKEN):
         os.remove(config.YOUTUBE_TOKEN)
     youtube_state["msg"] = ""
+    return redirect(url_for("settings"))
+
+
+# ---------------- TikTok ----------------
+tiktok_state = {"state": None, "msg": ""}
+
+
+@app.route("/tiktok/connect", methods=["POST"])
+def tiktok_connect():
+    import secrets
+    import webbrowser
+    from urllib.parse import urlencode
+    key, redirect_uri = os.getenv("TIKTOK_CLIENT_KEY"), os.getenv("TIKTOK_REDIRECT_URI", "").strip()
+    if not key or not os.getenv("TIKTOK_CLIENT_SECRET") or not redirect_uri:
+        flash("عمر Client key و Client secret و Redirect URI وضغط حفظ أولا", "error")
+        return redirect(url_for("settings"))
+    state = secrets.token_urlsafe(16)
+    tiktok_state.update(state=state, msg="تحل المتصفح… دخل لحساب TikTok ووافق")
+    webbrowser.open("https://www.tiktok.com/v2/auth/authorize/?" + urlencode({
+        "client_key": key, "response_type": "code", "scope": platforms.tiktok.SCOPES,
+        "redirect_uri": redirect_uri, "state": state}))
+    flash("تحل المتصفح: دخل لحساب TikTok ووافق، ومن بعد رجع لهنا", "ok")
+    return redirect(url_for("settings"))
+
+
+@app.route("/tiktok/callback")
+def tiktok_callback():
+    page = ("<html dir=rtl><body style='font-family:Segoe UI,Tahoma;text-align:center;padding:60px'>"
+            "<h2>{}</h2><p>{}</p></body></html>")
+    if not tiktok_state["state"] or request.args.get("state") != tiktok_state["state"]:
+        return page.format("❌ الرابط تسالا", "رجع للبرنامج وضغط «ربط TikTok» من جديد.")
+    if request.args.get("error"):
+        tiktok_state["msg"] = f"تلغى الربط: {request.args.get('error_description') or request.args['error']}"
+        return page.format("❌ ما تمش الربط", tiktok_state["msg"])
+    try:
+        platforms.tiktok.exchange_code(request.args.get("code"), os.getenv("TIKTOK_REDIRECT_URI", "").strip())
+        tiktok_state.update(state=None, msg="TikTok مربوط ✓")
+        return page.format("✅ تم ربط TikTok", "تقدر تسد هاد الصفحة وترجع للبرنامج SocialPoster.")
+    except Exception as e:
+        tiktok_state["msg"] = f"فشل الربط: {e}"
+        return page.format("❌ فشل الربط", str(e))
+
+
+@app.route("/tiktok/disconnect", methods=["POST"])
+def tiktok_disconnect():
+    if os.path.exists(config.TIKTOK_TOKEN):
+        os.remove(config.TIKTOK_TOKEN)
+    tiktok_state["msg"] = ""
     return redirect(url_for("settings"))
 
 

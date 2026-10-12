@@ -37,5 +37,7 @@ def status():
         miss = missing_keys(mod)
         if key == "youtube" and not os.path.exists(config.YOUTUBE_TOKEN):
             miss = miss + ["ربط الحساب من الإعدادات"]
+        if key == "tiktok" and not os.path.exists(config.TIKTOK_TOKEN):
+            miss = miss + ["ربط الحساب من الإعدادات"]
         out[key] = {"label": mod.LABEL, "media": mod.MEDIA, "ready": not miss, "missing": miss}
     return out

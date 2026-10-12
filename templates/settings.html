@@ -19,7 +19,7 @@
   // ملي يكمل ربط YouTube فالمتصفح، الصفحة كتحدث بوحدها
   setInterval(async () => {
     try { const r = await (await fetch('/api/youtube')).json();
-          if (r.connected && !{{ 'true' if yt_token else 'false' }}) location.reload(); } catch (e) {}
+          if ((r.connected && !{{ 'true' if yt_token else 'false' }}) || (r.tiktok && !{{ 'true' if tt_token else 'false' }})) location.reload(); } catch (e) {}
   }, 3000);
 </script>
   <h1>الإعدادات</h1>
@@ -66,6 +66,19 @@
             {% endif %}
           </div>
           {% if yt_msg %}<div class="hint" style="margin-top:6px">{{ yt_msg }}</div>{% endif %}
+        {% endif %}
+
+        {% if key == 'tiktok' %}
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            {% if tt_token %}
+              <span class="state ok">الحساب مربوط ✓</span>
+              <button class="ghost" formaction="/tiktok/disconnect" formnovalidate>فصل الحساب</button>
+            {% else %}
+              <button class="soft" formaction="/tiktok/connect" formnovalidate>ربط TikTok</button>
+              <span class="hint">عمر الخانات وضغط «حفظ» قبل</span>
+            {% endif %}
+          </div>
+          {% if tt_msg %}<div class="hint" style="margin-top:6px">{{ tt_msg }}</div>{% endif %}
         {% endif %}
       </div>
     </details>

@@ -19,6 +19,7 @@ DB = os.path.join(DATA_DIR, "posts.db")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 YOUTUBE_TOKEN = os.path.join(DATA_DIR, "youtube_token.json")
 YOUTUBE_SECRET = os.path.join(DATA_DIR, "client_secret.json")
+TIKTOK_TOKEN = os.path.join(DATA_DIR, "tiktok_token.json")
 
 os.makedirs(UPLOADS, exist_ok=True)
 
@@ -71,9 +72,13 @@ FIELDS = {
     },
     "tiktok": {
         "title": "TikTok",
-        "help": "developers.tiktok.com ← Content Posting API. حتى توافق TikTok على التطبيق، الفيديوهات كيبقاو خاصين.",
+        "help": "developers.tiktok.com ← Manage apps ← App ← زيد Login Kit و Content Posting API ← نسخ Client key و Client secret. "
+                "حتى توافق TikTok على التطبيق، الفيديوهات كيبقاو خاصين.",
         "fields": [
-            ("TIKTOK_ACCESS_TOKEN", "Access Token", "secret", ""),
+            ("TIKTOK_CLIENT_KEY", "Client key", "secret", ""),
+            ("TIKTOK_CLIENT_SECRET", "Client secret", "secret", ""),
+            ("TIKTOK_REDIRECT_URI", "Redirect URI (نفس اللي فـ Login Kit)", "text",
+             "https://USERNAME.github.io/SocialPoster/tiktok.html"),
             ("TIKTOK_PRIVACY", "SELF_ONLY ولا PUBLIC_TO_EVERYONE", "text", "SELF_ONLY"),
         ],
     },
