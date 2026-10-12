@@ -79,7 +79,8 @@ FIELDS = {
             ("TIKTOK_CLIENT_SECRET", "Client secret", "secret", ""),
             ("TIKTOK_REDIRECT_URI", "Redirect URI (نفس اللي فـ Login Kit)", "text",
              "https://USERNAME.github.io/SocialPoster/tiktok.html"),
-            ("TIKTOK_PRIVACY", "SELF_ONLY ولا PUBLIC_TO_EVERYONE", "text", "SELF_ONLY"),
+            ("TIKTOK_MODE", "طريقة النشر: draft (كتكمل من التيليفون) ولا direct (خاص موافقة TikTok)", "text", "draft"),
+            ("TIKTOK_PRIVACY", "فـ direct فقط: SELF_ONLY ولا PUBLIC_TO_EVERYONE", "text", "SELF_ONLY"),
         ],
     },
     "x": {
@@ -110,7 +111,7 @@ FIELDS = {
     },
 }
 
-DEFAULTS = {"DRY_RUN": "1", "START_WITH_WINDOWS": "0", "YOUTUBE_PRIVACY": "public", "TIKTOK_PRIVACY": "SELF_ONLY"}
+DEFAULTS = {"DRY_RUN": "1", "START_WITH_WINDOWS": "0", "YOUTUBE_PRIVACY": "public", "TIKTOK_PRIVACY": "SELF_ONLY", "TIKTOK_MODE": "draft"}
 
 
 def load():
