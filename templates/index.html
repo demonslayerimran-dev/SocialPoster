@@ -12,6 +12,9 @@
   table{width:100%;border-collapse:collapse;font-size:14px}
   td,th{padding:8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
   .table-wrap{overflow-x:auto}
+  button.copy{background:var(--accent-soft);color:var(--accent);padding:2px 10px;font-size:12px;border-radius:999px;font-weight:600}
+  button.copy.done{background:#e7f6ec;color:var(--ok)}
+  .tt-note{margin-top:6px;font-size:12px;background:#fff6e0;color:var(--warn);padding:4px 8px;border-radius:8px;display:inline-block}
 </style>
 {% endblock %}
 {% block body %}
@@ -66,7 +69,14 @@
       {% for p in posts %}
       <tr>
         <td>{{p.id}}</td>
-        <td>{{ (p.caption or '—')[:60] }}<div class="hint">{{ 'صورة' if p.media_type=='image' else 'فيديو' }}</div></td>
+        <td>{{ (p.caption or '—')[:60] }}
+          <div class="hint">{{ 'صورة' if p.media_type=='image' else 'فيديو' }}
+            {% if p.caption %}· <button type="button" class="copy" data-text="{{ p.caption }}">📋 نسخ النص</button>{% endif %}
+          </div>
+          {% for r in results.get(p.id, []) %}{% if r.platform == 'tiktok' and r.status == 'ok' and 'inbox' in (r.detail or '') %}
+            <div class="tt-note">📱 كمل النشر فـ TikTok: Inbox ← الفيديو ← لصق النص ← Post</div>
+          {% endif %}{% endfor %}
+        </td>
         <td>{{p.run_at.replace('T',' ')}}</td>
         <td>{{ {'scheduled':'مبرمج','running':'كينشر…','done':'تم ✓','partial':'تم جزئيا','failed':'فشل','cancelled':'ملغي'}[p.status] }}</td>
         <td>{% for r in results.get(p.id, []) %}
@@ -86,6 +96,19 @@
 <script>
   const file = document.getElementById('file'), drop = document.getElementById('drop'),
         dropText = document.getElementById('dropText'), preview = document.getElementById('preview');
+  // نسخ النص باش تلصقو فـ TikTok
+  async function copyText(t){
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta);
+    ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok;
+  }
+  document.querySelectorAll('button.copy').forEach(b => b.addEventListener('click', async () => {
+    if (await copyText(b.dataset.text)) {
+      b.textContent = '✓ تنسخ'; b.classList.add('done');
+      setTimeout(() => { b.textContent = '📋 نسخ النص'; b.classList.remove('done'); }, 2000);
+    }
+  }));
+
   function onFile(){
     const f = file.files[0]; if (!f) return;
     const type = f.type.startsWith('video') ? 'video' : 'image';
