@@ -16,7 +16,7 @@ REQUIRED = ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]
 MEDIA = ["video"]
 
 API = "https://open.tiktokapis.com/v2"
-SCOPES = "user.info.basic,video.publish"
+SCOPES = "user.info.basic,video.upload,video.publish"
 
 
 # ---------------- التوكن ----------------
@@ -65,6 +65,11 @@ def _check(r):
     j = r.json()
     err = j.get("error", {})
     if err.get("code") not in (None, "ok"):
+        if err.get("code") == "unaudited_client_can_only_post_to_private_accounts":
+            raise RuntimeError("النشر المباشر ممنوع حتى توافق TikTok على التطبيق. "
+                               "فالإعدادات بدل «طريقة النشر» لـ draft")
+        if err.get("code") == "scope_not_authorized":
+            raise RuntimeError("الصلاحية ناقصة: زيد video.upload فـ TikTok Developers، ومن بعد فصل وعاود «ربط TikTok»")
         raise RuntimeError(f"{err.get('code')}: {err.get('message')}")
     return j.get("data", {})
 
@@ -74,12 +79,18 @@ def post(file_path, media_type, caption, public_url=None):
     token = access_token()
     h = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"}
 
-    # 1) TikTok كتفرض نسولو على الإعدادات المسموحة للحساب
-    info = _check(requests.post(f"{API}/post/publish/creator_info/query/", headers=h, timeout=30))
-    allowed = info.get("privacy_level_options") or ["SELF_ONLY"]
-    privacy = os.getenv("TIKTOK_PRIVACY", "SELF_ONLY")
-    if privacy not in allowed:
-        privacy = "SELF_ONLY" if "SELF_ONLY" in allowed else allowed[0]
+    # "draft" = الفيديو كيمشي للـ inbox ديال TikTok وكتنشرو من التيليفون (كيخدم بلا موافقة TikTok)
+    # "direct" = نشر مباشر (خاص موافقة TikTok، ولا الحساب يكون Private)
+    mode = os.getenv("TIKTOK_MODE", "draft").strip().lower()
+    privacy = None
+
+    if mode == "direct":
+        # TikTok كتفرض نسولو على الإعدادات المسموحة للحساب
+        info = _check(requests.post(f"{API}/post/publish/creator_info/query/", headers=h, timeout=30))
+        allowed = info.get("privacy_level_options") or ["SELF_ONLY"]
+        privacy = os.getenv("TIKTOK_PRIVACY", "SELF_ONLY")
+        if privacy not in allowed:
+            privacy = "SELF_ONLY" if "SELF_ONLY" in allowed else allowed[0]
 
     # 2) حساب الأجزاء (chunks): أقل من 64MB = جزء واحد
     size = os.path.getsize(file_path)
@@ -89,11 +100,15 @@ def post(file_path, media_type, caption, public_url=None):
         chunk = 10 * 1024 * 1024
         count = size // chunk  # الجزء الأخير كياخد الباقي
 
-    init = _check(requests.post(f"{API}/post/publish/video/init/", headers=h, timeout=60, json={
-        "post_info": {"title": caption[:2200], "privacy_level": privacy},
-        "source_info": {"source": "FILE_UPLOAD", "video_size": size,
-                        "chunk_size": chunk, "total_chunk_count": count},
-    }))
+    source = {"source": "FILE_UPLOAD", "video_size": size, "chunk_size": chunk, "total_chunk_count": count}
+    if mode == "direct":
+        init = _check(requests.post(f"{API}/post/publish/video/init/", headers=h, timeout=60, json={
+            "post_info": {"title": caption[:2200], "privacy_level": privacy},
+            "source_info": source,
+        }))
+    else:
+        init = _check(requests.post(f"{API}/post/publish/inbox/video/init/", headers=h, timeout=60,
+                                    json={"source_info": source}))
 
     # 3) رفع الفيديو
     with open(file_path, "rb") as f:
@@ -117,6 +132,8 @@ def post(file_path, media_type, caption, public_url=None):
         st = _check(requests.post(f"{API}/post/publish/status/fetch/", headers=h, timeout=30,
                                   json={"publish_id": pid}))
         s = st.get("status")
+        if s == "SEND_TO_USER_INBOX":
+            return "تصيفط للـ inbox ديال TikTok — حل التطبيق فالتيليفون وكمل النشر (انسخ النص من البرنامج)"
         if s == "PUBLISH_COMPLETE":
             note = " (خاص — حتى توافق TikTok على التطبيق)" if privacy == "SELF_ONLY" else ""
             return f"تنشر{note}"
