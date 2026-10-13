@@ -1,20 +1,32 @@
 {% extends "base.html" %}
 {% block head %}
 <style>
-  .drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:#fbfaf7;display:block}
-  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
-  .drop img,.drop video{max-height:180px;max-width:100%;border-radius:8px;display:block;margin:0 auto 8px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
-  .pf{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
-  .pf.off{opacity:.5;cursor:not-allowed}
-  .pf small{display:block;color:var(--muted);font-size:12px}
-  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .drop{border:2px dashed var(--cyan);border-radius:16px;padding:26px;text-align:center;cursor:pointer;background:rgba(0,229,255,.05);display:block;transition:background .15s,box-shadow .15s}
+  .drop:hover,.drop.over{background:var(--cyan-soft);box-shadow:0 0 24px rgba(0,229,255,.3)}
+  .drop svg{display:block;margin:0 auto 8px}
+  .drop img,.drop video{max-height:200px;max-width:100%;border-radius:12px;display:block;margin:0 auto 10px;border:1px solid var(--glass-line)}
+  #dropText{font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .pf{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;transition:all .15s}
+  .pf:has(input:checked){background:var(--magenta-soft);border-color:var(--magenta-2);box-shadow:0 0 16px rgba(255,43,214,.3)}
+  .pf.off{opacity:.45;cursor:not-allowed}
+  .pf span{font-weight:700}
+  .pf small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .when{display:inline-flex;gap:4px;padding:4px;border-radius:12px;border:1px solid var(--line)}
+  .when label{padding:9px 18px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:600}
+  .when label:has(input:checked){background:var(--cyan-soft);color:#E6FCFF;box-shadow:0 0 0 1px var(--cyan) inset}
+  .when input{position:absolute;opacity:0;pointer-events:none}
+  .submit{width:100%;margin-top:20px;padding:17px;font-size:20px;font-family:"Almarai",sans-serif;font-weight:800}
   table{width:100%;border-collapse:collapse;font-size:14px}
-  td,th{padding:8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+  td,th{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+  th{color:var(--pink-ink);font-weight:700}
   .table-wrap{overflow-x:auto}
-  button.copy{background:var(--accent-soft);color:var(--accent);padding:2px 10px;font-size:12px;border-radius:999px;font-weight:600}
-  button.copy.done{background:#e7f6ec;color:var(--ok)}
-  .tt-note{margin-top:6px;font-size:12px;background:#fff6e0;color:var(--warn);padding:4px 8px;border-radius:8px;display:inline-block}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 2px}
+  .chips span{border:1px solid var(--cyan);color:var(--cyan-ink);padding:3px 12px;border-radius:999px;font-size:13px;font-weight:600;direction:ltr}
+  button.copy{background:transparent;border:1px solid var(--cyan);color:var(--cyan-ink);padding:2px 10px;font-size:12px;border-radius:999px;box-shadow:none}
+  button.copy.done{border-color:var(--ok);color:#BBF7D0}
+  .tt-note{margin-top:6px;font-size:12px;background:var(--warn-soft);color:#FDE68A;padding:4px 9px;border-radius:8px;display:inline-block}
 </style>
 {% endblock %}
 {% block body %}
@@ -30,13 +42,19 @@
     <h2>منشور جديد</h2>
     <label class="drop" id="drop">
       <input type="file" name="file" id="file" accept="image/*,video/mp4,video/quicktime" hidden required>
-      <div id="preview"></div>
+      <div id="preview"><svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" stroke-width="1.4" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></div>
       <div id="dropText">اضغط هنا ولا جر الصورة/الفيديو لهنا</div>
     </label>
 
     <label class="t" for="caption">النص (caption)</label>
     <textarea name="caption" id="caption" placeholder="كتب النص ديال المنشور… السطر الأول غادي يكون هو العنوان فـ YouTube وPinterest"></textarea>
     <div class="hint"><span id="count">0</span> حرف · X كيقبل 280 حرف فقط</div>
+
+    <label class="t" for="tags">Tags</label>
+    <input type="text" name="tags" id="tags" value="{{ last_tags }}" dir="auto"
+           placeholder="trading, forex, تداول, shorts" autocomplete="off">
+    <div class="chips" id="chips"></div>
+    <div class="hint">فرق بينهم بفاصلة ولا فراغ · YouTube: كيوليو Tags حقيقيين · باقي المنصات: كيتزادو كـ #هاشتاغات فآخر النص</div>
 
     <label class="t">المنصات</label>
     <div class="grid">
@@ -53,12 +71,14 @@
 
     <label class="t">إمتى؟</label>
     <div class="row">
-      <label><input type="radio" name="when" value="now" checked> دابا</label>
-      <label><input type="radio" name="when" value="later"> فوقت محدد</label>
+      <div class="when">
+        <label><input type="radio" name="when" value="now" checked> دابا</label>
+        <label><input type="radio" name="when" value="later"> فوقت محدد</label>
+      </div>
       <input type="datetime-local" name="run_at" id="run_at" min="{{now}}" style="max-width:260px;display:none">
     </div>
 
-    <div style="margin-top:18px"><button type="submit">نشر</button></div>
+    <button type="submit" class="submit">نشر فكل المنصات</button>
   </form>
 
   <div class="card">
@@ -70,8 +90,9 @@
       <tr>
         <td>{{p.id}}</td>
         <td>{{ (p.caption or '—')[:60] }}
+          {% if p.tags %}<div class="hint" dir="ltr" style="text-align:right">{% for t in p.tags.split() %}#{{t}} {% endfor %}</div>{% endif %}
           <div class="hint">{{ 'صورة' if p.media_type=='image' else 'فيديو' }}
-            {% if p.caption %}· <button type="button" class="copy" data-text="{{ p.caption }}">📋 نسخ النص</button>{% endif %}
+            {% if p.caption or p.tags %}· <button type="button" class="copy" data-text="{{ caption_for('tiktok', p.caption, p.tags) }}">📋 نسخ النص</button>{% endif %}
           </div>
           {% for r in results.get(p.id, []) %}{% if r.platform == 'tiktok' and r.status == 'ok' and 'inbox' in (r.detail or '') %}
             <div class="tt-note">📱 كمل النشر فـ TikTok: Inbox ← الفيديو ← لصق النص ← Post</div>
@@ -108,6 +129,18 @@
       setTimeout(() => { b.textContent = '📋 نسخ النص'; b.classList.remove('done'); }, 2000);
     }
   }));
+
+  // معاينة الـ tags كـ chips
+  const tagsIn = document.getElementById('tags'), chips = document.getElementById('chips');
+  function renderChips(){
+    const seen = new Set(), out = [];
+    tagsIn.value.split(/[,\n،;\s]+/).forEach(t => {
+      t = t.replace(/^#+/, '').replace(/[^\p{L}\p{N}_]/gu, '');
+      if (t && !seen.has(t.toLowerCase())) { seen.add(t.toLowerCase()); out.push(t); }
+    });
+    chips.innerHTML = out.map(t => `<span>#${t.replace(/</g,'')}</span>`).join('');
+  }
+  tagsIn.addEventListener('input', renderChips); renderChips();
 
   function onFile(){
     const f = file.files[0]; if (!f) return;

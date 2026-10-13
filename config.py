@@ -54,16 +54,27 @@ FIELDS = {
         "help": "Server Settings ← Integrations ← Webhooks ← New Webhook ← Copy Webhook URL",
         "fields": [("DISCORD_WEBHOOK_URL", "Webhook URL", "secret", "https://discord.com/api/webhooks/...")],
     },
-    "facebook": {
-        "title": "Facebook Page + Instagram",
-        "help": "developers.facebook.com ← App ← Graph API Explorer ← Page Access Token "
-                "(pages_manage_posts, instagram_content_publish). Instagram خاصو حساب Business/Creator مربوط بالصفحة.",
+    "meta": {
+        "title": "تطبيق Meta (مشترك بين Facebook و Instagram)",
+        "help": "developers.facebook.com ← My Apps ← التطبيق ديالك ← App settings ← Basic: نسخ App ID و App Secret وحفظ.",
         "fields": [
-            ("FB_PAGE_ID", "Page ID", "text", ""),
-            ("FB_PAGE_ACCESS_TOKEN", "Page Access Token", "secret", ""),
-            ("IG_USER_ID", "Instagram User ID", "text", ""),
-            ("PUBLIC_BASE_URL", "رابط عمومي (لـ Instagram فقط، مثلا من ngrok)", "text", "https://xxxx.ngrok-free.app"),
+            ("FB_APP_ID", "App ID", "text", ""),
+            ("FB_APP_SECRET", "App Secret", "secret", ""),
         ],
+    },
+    "facebook": {
+        "title": "Facebook Page",
+        "help": "Graph API Explorer ← اختار التطبيق ← الصلاحيات: pages_show_list، pages_read_engagement، pages_manage_posts "
+                "← Generate Access Token ← لصقو هنا وضغط «ربط Facebook».",
+        "fields": [],
+        "connect": "facebook",
+    },
+    "instagram": {
+        "title": "Instagram",
+        "help": "خاص حساب Professional مربوط بصفحة Facebook. Graph API Explorer ← الصلاحيات: pages_show_list، "
+                "business_management، instagram_basic، instagram_content_publish ← Generate Access Token ← لصقو هنا وضغط «ربط Instagram».",
+        "fields": [],
+        "connect": "instagram",
     },
     "youtube": {
         "title": "YouTube",

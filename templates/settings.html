@@ -2,16 +2,18 @@
 {% block head %}
 <style>
   details.card{padding:0}
-  details.card summary{padding:16px 20px;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;align-items:center;list-style:none}
-  details.card summary::-webkit-details-marker{display:none}
-  details.card .inner{padding:0 20px 18px}
-  .state{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}
-  .state.ok{background:#e7f6ec;color:var(--ok)} .state.no{background:#f1f0ec;color:var(--muted)}
-  .help{background:#faf9f6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted);margin-bottom:6px}
+  details.card > summary{padding:17px 22px;cursor:pointer;font-weight:700;font-size:17px;display:flex;justify-content:space-between;align-items:center;list-style:none}
+  details.card > summary::-webkit-details-marker{display:none}
+  details.card[open] > summary{color:var(--pink-ink)}
+  details.card .inner{padding:0 22px 20px}
+  .state{font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid}
+  .state.ok{background:var(--ok-soft);color:#BBF7D0;border-color:rgba(74,222,128,.45);box-shadow:0 0 12px rgba(74,222,128,.2)}
+  .state.no{background:rgba(201,190,234,.06);color:var(--muted);border-color:var(--line)}
+  .help{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.22);border-radius:12px;padding:10px 13px;font-size:13px;color:var(--cyan-ink);margin-bottom:6px;line-height:1.7}
   .check{display:flex;gap:10px;align-items:center;margin:10px 0}
-  .pw{position:relative} .pw button{position:absolute;left:6px;top:6px;padding:4px 10px;font-size:12px}
-  .save{position:sticky;bottom:12px;text-align:center}
-  .save button{box-shadow:0 6px 20px rgba(107,60,245,.35);padding:13px 40px}
+  .pw{position:relative} .pw button{position:absolute;left:6px;top:6px;padding:5px 11px;font-size:12px}
+  .save{position:sticky;bottom:14px;text-align:center}
+  .save button{padding:14px 48px;font-size:17px}
 </style>
 {% endblock %}
 {% block body %}
@@ -31,10 +33,7 @@
     <details class="card" {% if loop.first %}open{% endif %}>
       <summary>
         <span>{{ g.title }}</span>
-        {% if key == 'facebook' %}
-          {% set ok1 = status.facebook.ready %}{% set ok2 = status.instagram.ready %}
-          <span class="state {{ 'ok' if ok1 else 'no' }}">FB {{ '✓' if ok1 else '—' }} · IG {{ '✓' if ok2 else '—' }}</span>
-        {% elif st %}
+        {% if st %}
           <span class="state {{ 'ok' if st.ready else 'no' }}">{{ 'مربوطة ✓' if st.ready else 'ماشي مربوطة' }}</span>
         {% endif %}
       </summary>
@@ -66,6 +65,24 @@
             {% endif %}
           </div>
           {% if yt_msg %}<div class="hint" style="margin-top:6px">{{ yt_msg }}</div>{% endif %}
+        {% endif %}
+
+        {% if g.connect %}
+          {% set c = g.connect %}
+          {% if status[c].ready %}
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span class="state ok">
+                {% if c == 'facebook' %}الصفحة: {{ values.get('FB_PAGE_NAME') or values.get('FB_PAGE_ID') or 'مربوطة' }} ✓
+                {% else %}<span dir="ltr">@{{ values.get('IG_USERNAME') or values.get('IG_USER_ID') or 'instagram' }}</span> ✓{% endif %}
+              </span>
+              <button class="ghost" formaction="/{{c}}/disconnect" formnovalidate>فصل الحساب</button>
+            </div>
+            <details style="margin-top:10px"><summary class="hint" style="cursor:pointer">بدل الحساب / جدد التوكن</summary>
+          {% endif %}
+          <label class="t" for="{{ 'fb' if c == 'facebook' else 'ig' }}_user_token">التوكن من Graph API Explorer</label>
+          <input type="text" id="{{ 'fb' if c == 'facebook' else 'ig' }}_user_token" name="{{ 'fb' if c == 'facebook' else 'ig' }}_user_token" placeholder="EAAB..." autocomplete="off" dir="ltr">
+          <div style="margin-top:10px"><button class="soft" formaction="/{{c}}/connect" formnovalidate>ربط {{ 'Facebook' if c == 'facebook' else 'Instagram' }}</button></div>
+          {% if status[c].ready %}</details>{% endif %}
         {% endif %}
 
         {% if key == 'tiktok' %}

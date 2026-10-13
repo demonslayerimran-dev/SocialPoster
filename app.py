@@ -14,12 +14,16 @@ import config
 
 config.load()
 import platforms  # noqa: E402
+import tags as tagslib  # noqa: E402
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v"}
 
 app = Flask(__name__, template_folder=config.resource_path("templates"))
 app.secret_key = uuid.uuid4().hex
+# باش الواجهة تقدر تبين النص النهائي (مع الهاشتاغات) ديال كل منصة
+app.jinja_env.globals["caption_for"] = lambda platform, caption, tags: tagslib.caption_for(
+    platform, caption, tagslib.parse(tags))
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024  # 2GB
 lock = threading.Lock()
 youtube_state = {"msg": ""}
@@ -54,6 +58,10 @@ def init_db():
         con.execute("""CREATE TABLE IF NOT EXISTS results(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             post_id INTEGER, platform TEXT, status TEXT, detail TEXT)""")
+        # النسخ القديمة ما فيهاش العمود ديال tags
+        cols = [r[1] for r in con.execute("PRAGMA table_info(posts)")]
+        if "tags" not in cols:
+            con.execute("ALTER TABLE posts ADD COLUMN tags TEXT DEFAULT ''")
         # إلا تسد البرنامج وسط النشر، نرجعو المنشور للانتظار
         con.execute("UPDATE posts SET status='scheduled' WHERE status='running'")
 
@@ -82,7 +90,10 @@ def publish(post_id):
             if dry_run():
                 detail = "وضع التجربة: ما تنشرش بصح"
             else:
-                detail = mod.post(path, p["media_type"], p["caption"] or "", public_url)
+                tag_list = tagslib.parse(p["tags"])
+                text = tagslib.caption_for(t["platform"], p["caption"], tag_list)
+                extra = {"tags": tagslib.youtube_tags(tag_list)} if t["platform"] == "youtube" else {}
+                detail = mod.post(path, p["media_type"], text, public_url, **extra)
             status = "ok"
             ok_count += 1
         except Exception as e:  # كنسجلو الخطأ ونكملو مع المنصات الأخرى
@@ -124,7 +135,8 @@ def index():
         for r in con.execute("SELECT * FROM results"):
             results.setdefault(r["post_id"], []).append(r)
     st = platforms.status()
-    return render_template("index.html", status=st, posts=posts, results=results,
+    last_tags = next((p["tags"] for p in posts if p["tags"]), "")
+    return render_template("index.html", status=st, posts=posts, results=results, last_tags=last_tags,
                            dry_run=dry_run(), page="post",
                            any_ready=any(s["ready"] for s in st.values()),
                            now=datetime.now().strftime("%Y-%m-%dT%H:%M"))
@@ -135,6 +147,7 @@ def create_post():
     f = request.files.get("file")
     chosen = request.form.getlist("platforms")
     caption = request.form.get("caption", "").strip()
+    tags_raw = " ".join(tagslib.parse(request.form.get("tags", "")))
     when = request.form.get("when")
     now = datetime.now().strftime("%Y-%m-%dT%H:%M")
     run_at = request.form.get("run_at") or now
@@ -163,8 +176,8 @@ def create_post():
 
     with db() as con:
         cur = con.execute(
-            "INSERT INTO posts(file, media_type, caption, run_at, created_at, status) VALUES(?,?,?,?,?,?)",
-            (name, media_type, caption, run_at if when == "later" else now, now, "scheduled"))
+            "INSERT INTO posts(file, media_type, caption, tags, run_at, created_at, status) VALUES(?,?,?,?,?,?,?)",
+            (name, media_type, caption, tags_raw, run_at if when == "later" else now, now, "scheduled"))
         pid = cur.lastrowid
         for p in usable:
             con.execute("INSERT INTO results(post_id, platform, status, detail) VALUES(?,?,?,?)",
@@ -298,6 +311,88 @@ def youtube_disconnect():
     if os.path.exists(config.YOUTUBE_TOKEN):
         os.remove(config.YOUTUBE_TOKEN)
     youtube_state["msg"] = ""
+    return redirect(url_for("settings"))
+
+
+# ---------------- Facebook و Instagram (كل واحد بوحدو) ----------------
+META_API = "https://graph.facebook.com/v21.0"
+
+
+def _meta_pages(token_field):
+    """كياخد التوكن القصير، كيحولو لطويل، وكيرجع الصفحات (مع Instagram المربوط بكل وحدة)"""
+    import requests as rq
+    app_id = request.form.get("FB_APP_ID", "").strip() or os.getenv("FB_APP_ID", "")
+    secret = request.form.get("FB_APP_SECRET", "").strip() or os.getenv("FB_APP_SECRET", "")
+    short = request.form.get(token_field, "").strip()
+    if not (app_id and secret):
+        raise RuntimeError("عمر App ID و App Secret فـ «تطبيق Meta» أولا")
+    if not short:
+        raise RuntimeError("لصق التوكن من Graph API Explorer")
+    config.save({"FB_APP_ID": app_id, "FB_APP_SECRET": secret})
+    j = rq.get(f"{META_API}/oauth/access_token", timeout=30, params={
+        "grant_type": "fb_exchange_token", "client_id": app_id,
+        "client_secret": secret, "fb_exchange_token": short}).json()
+    if "access_token" not in j:
+        raise RuntimeError(j.get("error", {}).get("message", j))
+    pages = rq.get(f"{META_API}/me/accounts", timeout=30, params={
+        "fields": "id,name,access_token,instagram_business_account{id,username}",
+        "access_token": j["access_token"]}).json()
+    if "error" in pages:
+        raise RuntimeError(pages["error"].get("message"))
+    pages = pages.get("data", [])
+    if not pages:
+        raise RuntimeError("ما لقيت حتى صفحة. تأكد من pages_show_list وأنك اخترتي الصفحة ملي وافقتي")
+    return pages
+
+
+@app.route("/facebook/connect", methods=["POST"])
+def facebook_connect():
+    try:
+        pages = _meta_pages("fb_user_token")
+        page = next((p for p in pages if p["id"] == os.getenv("FB_PAGE_ID", "")), pages[0])
+        config.save({"FB_PAGE_ID": page["id"], "FB_PAGE_ACCESS_TOKEN": page["access_token"],
+                     "FB_PAGE_NAME": page["name"]})
+        msg = f"Facebook: تربطات الصفحة «{page['name']}» ✓"
+        if len(pages) > 1:
+            msg += " · صفحات أخرى: " + "، ".join(p["name"] for p in pages if p is not page)
+        flash(msg, "ok")
+    except Exception as e:
+        flash(f"Facebook: فشل الربط — {e}", "error")
+    return redirect(url_for("settings"))
+
+
+@app.route("/instagram/connect", methods=["POST"])
+def instagram_connect():
+    try:
+        pages = [p for p in _meta_pages("ig_user_token") if p.get("instagram_business_account")]
+        if not pages:
+            raise RuntimeError("ما لقيت حتى حساب Instagram Professional مربوط بشي صفحة ديالك "
+                               "(ولا نسيتي instagram_basic / business_management)")
+        page = next((p for p in pages if p["instagram_business_account"]["id"] == os.getenv("IG_USER_ID", "")), pages[0])
+        ig = page["instagram_business_account"]
+        config.save({"IG_USER_ID": ig["id"], "IG_USERNAME": ig.get("username", ""),
+                     "IG_PAGE_ID": page["id"], "IG_PAGE_TOKEN": page["access_token"]})
+        msg = f"Instagram: تربط @{ig.get('username')} ✓"
+        if len(pages) > 1:
+            msg += " · حسابات أخرى: " + "، ".join("@" + p["instagram_business_account"].get("username", "")
+                                                  for p in pages if p is not page)
+        flash(msg, "ok")
+    except Exception as e:
+        flash(f"Instagram: فشل الربط — {e}", "error")
+    return redirect(url_for("settings"))
+
+
+@app.route("/facebook/disconnect", methods=["POST"])
+def facebook_disconnect():
+    config.save({"FB_PAGE_ID": "", "FB_PAGE_ACCESS_TOKEN": "", "FB_PAGE_NAME": ""})
+    if not os.getenv("IG_PAGE_TOKEN"):  # النسخ القديمة: Instagram كان كيستعمل التوكن ديال Facebook
+        config.save({"IG_USER_ID": ""})
+    return redirect(url_for("settings"))
+
+
+@app.route("/instagram/disconnect", methods=["POST"])
+def instagram_disconnect():
+    config.save({"IG_USER_ID": "", "IG_USERNAME": "", "IG_PAGE_ID": "", "IG_PAGE_TOKEN": ""})
     return redirect(url_for("settings"))
 
 
